@@ -1,0 +1,584 @@
+---
+title: "Final-Project : Multiple Linear Regression in R"
+author: "Priyank Metha"
+date: "4/19/2020"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: TRUE
+runtime: shiny
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+<font size="6.5"> Patient Satisfaction of a Hospital </font>
+
+<font size="4"> The history of patient satisfaction goes back to 1985, when the hospitals started conducting surveys to determine the quality of services provided to the patients.[1] This study explains the interactions between the variables of the survey by conducting **Multiple Linear Regression** analysis. </font>
+
+# *Synopsis*
+
+![](Patient_Satisfaction.jpg){width=100%}
+
+## **Problem of Interest:** 
+
+<font size="3.5"> Patient satisfaction is an important and commonly used indicator for measuring the quality in health care. Patient
+satisfaction affects clinical outcomes, patient retention, and medical malpractice claims. It affects the timely, efficient, and patient-centered delivery of quality health care [1]. Thus it is important in healthcare industry specifically to hospitals and the management to determine the patient satisfaction and it's dependency on various factors involved. This helps the management in making data-driven decisions to improve the health care quality by understanding influences of the variables on Patient satisfaction rating. A survey is conducted by the hospitals to determine the patient satisfaction and patient's data is recorded. The health care industry is governed by it's own set of standards: HCAHPS (Hospital Consumer Assessment of Healthcare Providers and Systems) to record the satisfaction rating [3]. Thus one must understand the data and conduct it's analysis to determine whether the hospital is quality delivering healthcare or not. </font>
+
+## **Problem Statement:**
+
+<font size="3.5"> To explore this analysis, I will be using the data from one of the course PSYC 8100: Research Design and Quantitative analysis. This data was uploaded on Canvas as part of case study example in the course. Originally this is a well known problem in health care industry to determine the influences of variables in patient satisfaction rating. 
+The problem statement is as follows:
+
+**"A hospital administrator is studying the relation between patient satisfaction (dependent variable) and patient’s age (in years), severity of illness (an index), and anxiety level (an index). Data are reported for 46 randomly selected patients. For all index variables, higher values indicate more (satisfaction, severity, anxiety)."**
+
+I will be conducting multiple linear regression analysis to best fit a significant model which would explain maximum variations of the independent variables on satisfaction rating and conduct exploratory data analysis to determine the interactions between the variables. </font>
+
+## **Implementation:**
+
+<font size="3.5"> My proposed approach is to create a function to remove the outliers from the data by taking user input. This will help us to clean the data for any outliers in the ratings because of error in reading or entering the data. Further, I shall calculate the correlation coefficients of individual variable which would shed light on significant predictors. 
+
+I will then fit models using multiple linear regression and interpret the results to conclude the best fitted model followed by residual analysis of the best fit model. The goal here would be predict the patient satisfaction with prediction and confidence interval. I will further conduct a value analysis of data by 1-sample t test to determine the significance of the satisfaction rating. A Shiny app will be created for exploratory data analysis and data visualizations. 
+
+I shall then confirm the analysis by using another statistical tool "Minitab" and conduct further exploratory analysis by integrating R with Power BI for complex data analysis which would not have been easy on R/ Python. </font>
+
+# *Packages Required*
+
+<font size="3.5"> Following are the Packages required with its use: </font>
+
+```{r import and libraries, message=FALSE, warning=FALSE}
+
+library(ggplot2)      # Graphical Representation in R
+library(ggpubr)       # Allows easy to use function for creating and customizing ggplot2 plots
+library(car)          # Companion to Applied Regression
+library(jtools)       # Helpful in sharing results of regression analysis
+library(olsrr)        # Includes comprehensive regression analyis tests and residual analysis
+library(qicharts)     # Helpful in making run charts and control charts
+library(leaps)        # To implement Best Regression Subset Selection
+library(ggiraphExtra) # To plot interactive graphs of the model
+library(shiny)        # For interactive web applications with R
+```
+
+# *Data Preparation*
+
+## **Data Source:**
+
+<font size="3.5"> The source of data was in one of the course PSYC 8100: Research Design and Quantitative Analysis by Dr. Patrick Rosopa. It is a .txt file uploaded on canvas as part of case study. It is a well case study example in which a survey is conducted in a hospital (unknown/ not disclosed) as per HCAHPS standards.  </font>
+
+## **Original Dataset:**
+
+```{r echo=FALSE}
+# Importing Dataset
+
+Patient_Satisfaction <- read.table(file="PatientSatisfaction.txt", header=TRUE, sep="", na.strings="*", stringsAsFactors = FALSE)
+print(Patient_Satisfaction[1:10,])
+```
+
+## **Data Explanation:**
+
+<font size="3.5"> The data set above shows first 10 rows in the data. It is total of 46 rows and 4 columns which represent 4 variables viz. satisf, age, severity, anxiety.
+
+**satisf:**   It is Patient Satisfaction which is an index in range of 0-100. (Dependent Variable)
+
+**age:**      It is age of the patient in Years (Independent Variable)
+
+**severity:** It shows the severity of the illness of the patient which is an index on scale of 0-100 (Independent Variable)
+
+**anxiety:**  It shows the anxiety level of the patient which is an index on the scale of 0-5 (Independent Variable)
+
+All the data is continuous data with no outliers. But errors can happen and there can be possibility to remove any outliers present in the data. Hence data cleaning is an important step before proceeding with any type of analysis. </font>
+
+
+## **Data Cleaning:**
+
+<font size="3.5"> Outliers are present in the satisfaction rating column which needs to be removed before fitting the model. Else model developed might not be significant towards predicting patient satisfaction.
+
+A function named **"function_outlier"** is created. It would take any value of satisfaction rating as input and remove the rows which has that value present in the column of "satisf" and give us a new data set which does not have any outliers. Moreover, if the value entered is not present in the column, then it would return suggestion to the user.
+
+
+```{r}
+function_outlier <- function(x) #Creating new function
+  {
+  Patient_Satisfaction_new <- Patient_Satisfaction 
+  for (i in 1:nrow(Patient_Satisfaction)) #For loop to calculate number of rows
+    {
+    if(Patient_Satisfaction_new[i,1] %in% x) # Determing the cell having x
+      {
+      Patient_Satisfaction_new <- Patient_Satisfaction_new[-i,] # Removing the row containing x
+      }
+    }
+if(nrow(Patient_Satisfaction) == nrow(Patient_Satisfaction_new))
+{
+  print("Value entered is not present in the Column satisfy. Enter a different value to remove.")
+} else {
+   return(Patient_Satisfaction_new) # returning the cleaned dataset
+  }
+}
+```
+
+To demonstrate the function **"function_outlier"**, the function is called twice. First time the value passed is "100" and second time the value passed is "66".
+
+```{r}
+# Example of calling the function created
+
+function_outlier(100) 
+function_outlier(66)
+```
+
+**Results:** 
+When the value passed is "100", since the it is not present in satisf column, the function throws the Error and gives suggestion to the user. This ensures users that the outlier is not present in the dataset.
+
+When the value passed is "66", the function removed all the rows which has value "66" in the column of satisf. The dataset generated does not have columns "3", "16" and "41".
+
+Therefore one can use this function to remove any outlier present which helps towards data cleaning.
+
+Value "66" was just an example. In this dataset there are no outliers present and all the observations are used . </font>
+
+
+# *Correlation Coefficient Calculations* {.tabset .tabset-fade}
+
+<font size="3.5"> The correlation coefficient indicates the direction and strength of the linear dependence between two variables. Correlation coefficients range from -1 to 1.
+
+The correlation coefficients are calculated between each independent variable with dependent variable satisf. The sample size is 46.
+
+
+## Satisfaction vs Age
+
+The following graph represents scatter plot of Satisfaction and Age with Pearson coefficient and p-value
+
+```{r echo=FALSE}
+ggscatter(Patient_Satisfaction, x = "satisf", y = "age", conf.int = T, cor.coef = T, cor.method = "pearson", 
+          title = "Scatter Plot of Satisfaction vs Age", xlab = "Satisfaction Rating", ylab = "Age")
+
+summary1 <- cor.test(Patient_Satisfaction$satisf, Patient_Satisfaction$age, 
+                method = "pearson")
+summary1
+```
+
+**Results:**  Results of Pearson correlation indicates that there is significant negative association between Satisfaction Rating and Age, (r(44) = -0.79, p < 0.001)
+
+
+## Satisfaction vs Severity
+
+The following graph represents scatterplot of Satisfaction and Severity with Pearson coefficient and p-value
+
+```{r echo=FALSE}
+ggscatter(Patient_Satisfaction, x = "satisf", y = "severity", conf.int = T, cor.coef = T, cor.method = "pearson", 
+          title = "Scatter Plot of Satisfaction vs Severity",xlab = "Satisfaction Rating", ylab = "Severity")
+
+summary2 <- cor.test(Patient_Satisfaction$satisf, Patient_Satisfaction$severity, 
+                     method = "pearson")
+summary2
+```
+
+**Results:**  Results of Pearson correlation indicates that there is less significant negative association between Satisfaction Rating and severity, (r(44) = -0.60, p < 0.001)
+
+## Satisfaction vs Anxiety
+
+The following graph represents scatterplot of Satisfaction and Anxiety with Pearson coefficient and p-value
+
+```{r echo=FALSE}
+ggscatter(Patient_Satisfaction, x = "satisf", y = "anxiety", conf.int = T, cor.coef = T, cor.method = "pearson", 
+          title = "Scatter Plot of Satisfaction vs Anxiety",xlab = "Satisfaction Rating", ylab = "Anxiety")
+
+summary3 <- cor.test(Patient_Satisfaction$satisf, Patient_Satisfaction$anxiety, 
+                     method = "pearson")
+summary3
+
+```
+
+**Results:**  Results of Pearson correlation indicates that there is significant negative association between Satisfaction Rating and anxiety, (r(44) = -0.64, p < 0.001)
+
+# *Summary of Correlation Coefficients*
+
+From the plots and results of Pearson correlations we conclude that there is negative linear relationship between independent variable in the order of Age (-0.79) > Anxiety (-0.64) > Severity (-0.60). Thus Severity of illness's effect on patient satisfaction rating is least. </font>
+
+# *Multiple Linear Regression*
+
+<font size="3.5"> Multiple linear regression is a statistical technique to model the relationship between one dependent variable and two or more independent variables by fitting the data set into a linear equation. Total of 5 different models are predicted using various methods in Multiple Linear Regression followed by comparison using the Best Subset method. Further Residual Analysis is conducted to verify the assumptions of the selected model.
+
+## Fitting the Model
+
+```{r}
+# Creating Model 1
+
+model1 <- lm(satisf~age+severity+anxiety, data = Patient_Satisfaction)
+summary(model1)
+summ(model1, scale = T, transform.response = T, part.corr = T, vifs = T, digits = 4)
+```
+
+**Results:** 
+
+In model 1, we can see that the p-value < 0.05. Therefore, the model is significant. Next we check for multicollinearity. Multicollinearity is the situation when two or more independent variables in a multiple regression model are correlated with each other. To detect multicollinearity, we use VIF (Variance Inflation Factor) to quantify its significance in the model. The VIF of all factors are < 5 which shows no multi-collinearity exists.
+
+But the p-value of severity is 0.374. Therefore we fail to reject the null claiming the predictor severity is not statistically significant. This is evident from correlation coefficient of severity as well.
+
+Thus re-fit the model by removing severity.
+
+## Re-fitting the Model
+
+In model 2, we remove the severity predictor and re-run the model
+
+```{r}
+# Creating Model 2
+
+model2 <- lm(satisf~age+anxiety, data = Patient_Satisfaction)
+summary(model2)
+summ(model2, scale = T, transform.response = T, part.corr = T, vifs = T, digits = 4)
+```
+
+**Results:** 
+
+In model 2 obtained we can see that p-value of the model 2 is 2.98e-11 < 0.05 showing the model is significant.
+
+Adjusted R-square vale: 0661 Showing 66.1% of the variation in Patient Satisfaction can be explained by predictor variables age and anxiety
+
+No multicollinearity exists. 
+
+p-value of both predictors are <0.05. Therefore we can say that predictors in model 2 are significant. 
+
+Overall, we can conclude model 2 is significant model to predict patient satisfaction.
+
+We further run Stepwise regression for selecting better model.
+
+## Model Selection in R
+
+```{r}
+lm <- lm(satisf~., data = Patient_Satisfaction)
+```
+
+### Forward Elimination
+
+This method starts with NO explanatory variables in the model and adds them one at a time. The variable that results in the largest t-statistic (or F statistic) value is inserted at each step, as long as the value of the test statistics exceeds the threshold value.
+
+```{r}
+# Creating Model 3
+
+model3<- step(lm,direction="forward",test = "F")
+summary(model3)
+```
+
+**Results:**
+
+The model 3 obtained is same as model 1 which we obtained above.
+
+
+### Backward Elimination
+
+This method starts with ALL the explanatory variables in the model and successively eliminates them based on the variable of the t-test statistics, as long as the smallest t-statistic (or F statistic) is less than a cutoff value.
+
+```{r}
+# Creating Model 4
+
+model4 <- step(lm,direction = "backward",test = "F")
+summary(model4)
+```
+
+**Results:**
+
+The model 4 obtained is same as model 2 which we obtained above.
+
+### Stepwise Regression
+
+A combination of forward and backward stepping. This procedure begins with a forward step but immediately after inserting a variable, a backward elimination step is conducted to determine if any variables that were added at previous steps can now be moved.
+
+```{r}
+# Creating Model 5
+model5 <- step(lm,direction = "both",test = "F")
+summary(model5)
+```
+
+**Results:**
+
+Both Backward Elimination and Stepwise Selection selected the model with age and anxiety as significant predictors which is exactly similar to model 2 obtained.
+
+## Best Subset
+
+If the number of potential explanatory variables is not too large, one way to select the subset of regressors for the model is to fit all possible subset models and evaluate these candidate models with respect to appropriate criteria to make the final choice.
+
+```{r}
+# Creating Best_Model
+
+best <- regsubsets(satisf~.,data = Patient_Satisfaction)
+
+plot(best, scale = "adjr2", main = "Best-fit:Adjusted R square")
+plot(best, scale = "Cp", main = "Best-fit:Cp")
+plot(best, scale = "bic", main = "Best-fit:BIC")
+
+best_model <- summary(best)
+model_table <- data.frame(best_model$outmat,best_model$adjr2,best_model$rss,best_model$cp,best_model$bic)
+model_table
+```
+
+**Results:**
+
+Using the criteria of large adjust r-squared, small rss, small Cp and small BIC in the table of best_model we select the model in the 2nd row of the table above. 
+
+This best selected model is same as model 2. 
+
+From all the above tests conducted we select model 2 = model 4 = model 5 = best model for predicting the Patient satisfaction rating.
+
+Therefore we proceed with residual analysis on model 2 to verify the assumptions
+
+## Residual Analysis
+
+We selected model 2 as the significant model towards predicting Patient Satisfaction. Now we determine if there is any other issue with model assumptions for which we conduct residual analysis.
+
+Assumption 1 : The residuals are normally distributed, mean equal to zero.
+
+```{r}
+# Normality Test
+ols_plot_resid_qq(model2)
+ols_test_normality(model2)
+mean(resid(model2))
+```
+
+**Results:**
+
+We can see that the p-value for Anderson-darling test is 0.2051 > 0.05. Thus fail to reject the null hypothesis and conclude that the residuals are normally distributed.
+
+The mean is very very low i.e 7.25e-17 which is 0.
+
+Thus we have that residual are normally distributed with mean equal to zero
+
+
+Assumption 2: The residuals are independent.
+
+```{r}
+# I-Mr chart to test independency
+qic(resid(model2), chart = 'i')
+qic(resid(model2), chart = 'mr')
+```
+
+**Results:**
+
+If no data points are out of control in both the I-chart and MR chart, the residuals are independent of each other.
+
+Since the I-MR chart is in control, residuals are independent.
+
+
+Assumption 3: The residuals have a constant variance.
+
+```{r}
+# Residues vs Fits Plot
+ols_plot_resid_fit(model2)
+```
+
+**Results:**
+
+Finally, we verify that the residuals have equal variance across the predicted responses. We can see how the residual values disperse evenly around zero and therefore, hetroscedasticity does not exist.
+
+Heteroscedasticity is the condition where the assumption of equal variance is violated, and can lead us to believe a variable is a predictor when it is not.
+
+
+# *Summary of Model 2*
+
+We select Model 2 as the best fit model for predicting patient satisfaction. 
+
+```{r}
+summary(model2)
+summ(model2, scale = T, transform.response = T, part.corr = T, vifs = T, digits = 4)
+```
+
+**Summary:**
+
+From the summary of model 2 above we can conclude the following:
+
+A multiple linear regression is conducted to form a model with satisf as the dependent variable and 2 independent variable (age and anxiety). Based on the summary of fitted model it is found that the model is statistically significant with (F(2,43) = 44.8, p <0.001, Multiple R2 = 0.6767, Adjusted R2 = 06610). The individual predictors are examined further and indicates that age (t = -5.882, p <0.001) and anxiety (t = -2.753, p = 0.00861) are significant predictors. The weighted combination of the predictor explains approximately 66.1% of variation in the Patient Satisfaction.
+
+Explanation of Multicollinearity: Based on VIF values calculate above it is observed that all the VIFs < 5 and close to 1 indicating no multicollinearity present. Generally, VIF values > 5 or 10 indicate the presence of multicollinearity
+
+The Fitted model is **"satisf = 145.94 - 1.2005*(age) - 16.7421*(anxiety)"**
+
+To further understand the model graphically we plot the model and try to understand individual variable:
+
+```{r}
+ggPredict(model2,interactive = T,colorn = 100, jitter = F)
+```
+
+In the graph above we can that as the anxiety is decreases patient satisfaction level increases and vice versa.
+
+Moreover, with constant anxiety level, patient satisfaction decreases as the age increases. 
+
+These conclusions are well in correlation with model equation presented above. One can hover over the graph to see the values of anxiety and the corresponding equation of the model. 
+
+# *Confidence and Prediction Intervals*
+
+The purpose of building a regression model is not only to understand what happened in the past but more importantly to predict the future based on the past.
+
+If we wanted to see what the prediction was for age = 26, severity = 42, anxiety = 2.8
+
+```{r}
+predict_model2 <- data.frame(age = 26, severity = 42, anxiety = 2.8)
+predict(model2, newdata = predict_model2)
+
+#Confidence Interval
+
+predict(model2, newdata = predict_model2, interval = "confidence")
+
+#Prediction Interval
+
+predict(model2, newdata = predict_model2, interval = "prediction")
+```
+
+**Results:**
+
+The fitted regression line gives the value of 67.85 with confidence interval (lwr = 57.31, upr = 78.38992) and prediction interval (lwr = 45.03, upr = 90.66). 
+
+Prediction interval is wider than confidence interval because it accounts for the uncertainty in the estimates of regression parameters and the uncertainty of the new measurement.
+
+# *Value Analysis*
+
+The data of patient satisfaction helps us determine whether the hospital where this survey was conducted (unknown as data set is from one of the coursework) satisfies the quality or not.
+
+For a hospital to pass the standards of patient satisfaction, it must have atleast 78.13% of satisfaction rating [4]. To check this we conducted 1-sample T test.
+
+## One-sample T test - Hospital satisfaction rating performance to have at least 78.13% of satisfaction rating to be good
+
+```{r}
+one_sample <- t.test(Patient_Satisfaction$satisf , mu=78.13)
+print(one_sample)
+```
+
+**Results:**
+
+One sample t-test is conducted on the satisf column of the data set (p < 0.001, t = -6.51). Therefore, we reject the null hypothesis and conclude that the mean of satisf is not equal to 78.13. Thus we have the evidence that this hospital does pass the standards of patient satisfaction and it needs to improve it's quality of health care.
+
+
+# *Exploratory Data Analysis*
+
+It is interesting to conduct exploratory data analysis to know more about the data and make conclusions. Shiny App is a useful tool in R which helps in conducting data analysis. A Shiny app is created with 2 features to perform exploratory data analysis.
+
+## To determine relations between various columns
+
+This interactive App helps us in determining various relations by selecting x and y variable. A Scatter plot is generated with a fitted line to determine relations between columns.
+
+```{r echo=FALSE}
+
+   selectInput("Xaxis", label = "Choose X variable",choices=names(Patient_Satisfaction))
+   selectInput("Yaxis", label = "Choose Y variable",choices=names(Patient_Satisfaction))
+
+```
+
+```{r echo=FALSE}
+renderPlot(scatterplot(Patient_Satisfaction[,input$Xaxis],Patient_Satisfaction[,input$Yaxis],xlab = as.character(input$Xaxis),
+                ylab = as.character(input$Yaxis),main = "ScatterPlot"))
+```
+
+**Results:**
+
+For example, when we select **age** as X variable and **severity** as Y variable: we can conclude that as the age increases, the severity of illness also increases which is generally the case. Therefore such type of conclusions helps in data analysis.
+
+## To determine satisfaction rating for range of Age
+
+This interactive App gives us the dataset sorted with respect to Age range which would help determine population of Age group visiting that particular hospital.
+
+```{r}
+sliderInput(
+  inputId='Slider', label = 'Select Age Range',
+  min=min(Patient_Satisfaction$age), max=max(Patient_Satisfaction$age), value=c(min,max), step = 1
+)
+
+DT::renderDataTable(Patient_Satisfaction[Patient_Satisfaction$age %in% as.integer(input$Slider[1]):as.integer(input$Slider[2]),])
+```
+
+**Results:**
+
+For example, we can see for Age range of 30-40 years, the patient satisfaction rating are better compared to age group of 40-50. Moreover, the number of patients visiting are hospitals are fewer in the age group of 30-40 years.
+
+# *Segments*
+
+R is a robust tool when it comes to statistical analysis. However, I believe that getting the best out of individual tools helps in conducting complex data and statistics analysis. We can get the best of individual tools which would further help us in making data driven decisions.
+
+Having professional experience in Power BI and Minitab, I tried to conduct similar analysis on these tools and tried to present here in the best way possible. 
+
+I conducted Regression Analysis on Mintab from the dataset generated in R after data cleaning. Thus here the power of R is used for data cleaning using the function **"function_outlier"** and power of Mintab is used to conducted regression analysis within few steps. 
+I conducted the exploratory Data Analysis on Power BI by integrating it with R. I created correlation matrix by scripting on R in Power BI and used slider from Power BI for making it interactive with respect to Age. Also I created Linear regression model2 plot using R script and added severity scale as a slider. Doing this completely on R would require hard coding on Shiny which would take a lot of time whereas doing it entirely on Power BI would not have been possible at all as it does have correlation matrix function and ggPredict function. Thus using best out of this tools makes it pretty easy to create such type of interactive dashboards for data analysis and visualizations.
+
+## Minitab Segment {.tabset .tabset-fade}
+
+I exported the dataset after data cleaning through R in .csv format which can be opened in Minitab.
+
+```{r}
+write.table(Patient_Satisfaction, file = "Minitab_Patient_Satisfaction.csv" , row.names = F, sep = ",")
+```
+
+Then following Multiple linear regression analysis on Minitab I was able to re-create the same models viz. model 1 and model 2 obtained above.
+
+### Model 1 in Minitab
+
+This Model obtained on Mintab is exactly same as the model 1 obtained on R.
+
+![Minitab Model 1](Minitab_Model_1.JPG)
+
+Thus we can see that Mintab Model 1 = model 1 (in R).
+
+
+### Model 2 in Minitab
+
+This Model obtained on Mintab is exactly same as the model 2 obtained on R.
+ 
+![Minitab Model 2](Minitab_Model_2.JPG) 
+
+Thus we can see that Mintab Model 2 = model 2 (in R).
+
+## Power BI segment: {.tabset .tabset-fade}
+
+In Power BI, I used the R script functions to create plots and add sliders to make further data-driven decisions.
+
+### Correlation Matrix
+
+In Power BI, I used the R script function to create a plot of correlation matrix and added a slider of Age group through Power BI for exploratory data analysis.
+
+![Correlation Matrix](PowerBI_Correlation Matrix.JPG)
+
+A quick conclusion one can make is that for age group of 51-55, the correlation between age vs severity is intense and that of age vs anxiety is slightly less intense compared to former.
+
+### Regression plot
+
+In Power BI, I used R script to create model 2 (best model in R) and used function ggPredict to make interactive graph of the model. Further, I added a slider for severity scale through Power BI which was not done in R.
+
+![Regression Plot](PowerBI_Regression Plot.JPG)
+
+A quick conclusion one can make is that for severity scale of 59 - 62, the anxiety scale of above 2.8 is present. Thus higher the severity of illness, higher would be anxiety level of the patient which is the case in general.
+
+
+**Summary:** Thus, data analysis and visualization becomes easy with combination of such tools and this process can be applied to any Industry for making data-driven decisions and solving real world problems. Unfortunately, the dashboard I created cannot be published as it requires Pro version of Power BI which is Paid Service. Hence, I have included the Images above and attaching Power BI .pbix file which can be view by downloading Power BI free version from the internet
+
+
+# *Conclusions*
+
+To sum up, the following observations were made:
+
+1. A function **"function_outlier"** was created to remove any outliers if present in the data.
+2. A correlation coefficient were calculated to determine the relationship of independent variable to dependent variables. Severity      turns to have least pearson coefficient.
+3. Various methods of Multiple Linear Regression was used to fit the model. Model 2 turns out to be the best fir with age and anxiety    as significant predictors. 66.1% of the variation in the model were explained by these predictors.
+4. 1-sample t test was conducted to determine the satisfaction standards of the hospital. Apparently, the hospital from where this data    was collected did not pass the test indicating poor delivery of healthcare facility
+5. Exploratory Data Analysis was conducted using Shiny App.
+6. An overlap of various tools such as Minitab and Power BI was shown and it's combinations were used to create dashboards.
+
+**Limitations:** 
+
+The dataset obtained is a small dataset with 3 independent variables and it shows the survey conducted was not so rigorous. A more rigorous survey can be conducted which would include more variables such as gender, No. of days in hospital, Description of Illness etc. which would give more insights into the data and similar approach can be used to predict the model. It would be interesting to know how age and no. of days in hospital would affect the model's significance. 
+
+# *Bio*
+
+![Priyank Metha](Priyank Metha.jpeg){width=20%}
+
+My name is Priyank Metha. I am Mechanical Engineering graduate student at Clemson University. Currently I am working on a group-project of developing 6-axis robotic arm. In my role of Quality Engineering Analyst at Volvo Cars, I drove the major project of developing interactive dashboards on data visualization tool for management team which would assist them in making data-driven decisions. This made me a proficient user of Power BI tool. Along with this I took various DMAIC projects on the assembly line for problem solving. These projects sparked my interest in statistical analysis and I learned and applied Minitab and R for data and statistical analysis to solve real world problems. I successfully completed Lean Six Sigma Green belt certification. I am passionate about solving complex problem through these quantitative and qualitative tools I have learned and make meaningful impact to business outcomes. I have a professional experience as a Manufacturing engineer and Junior design engineer as well. Outside of professional work life, I like to Swim, play ping pong and Binge Books and plan road trips.
+
+
+# *References*
+
+[1] https://journalofethics.ama-assn.org/article/patient-satisfaction-history-myths-and-misperceptions/2013-11
+
+[2] https://www.facilitiesnet.com/graphics/webcasts/20171130-patient-satisfaction.jpg
+
+[3] https://www.cms.gov/Medicare/Quality-Initiatives-Patient-Assessment-Instruments/HospitalQualityInits/Downloads/HospitalHCAHPSFactSheet201007.pdf
+
+[4] https://hcahpsonline.org/globalassets/hcahps/star-ratings/tech-notes/hcahps_stars_tech_notes_april_2020_cr_cc.pdf
+
+[5] PSYC 8100: Research Design and Quantitative Analysis by Dr. Patrick Rosopa. </font>  
+
